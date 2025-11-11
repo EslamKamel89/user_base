@@ -3,6 +3,8 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.utils.validate import Validate
+
 
 class UserBase(BaseModel):
     name:str
@@ -10,28 +12,22 @@ class UserBase(BaseModel):
     
     @field_validator('name')
     @classmethod
-    def validate_name(cls , v:str) : 
-        if not v or len(v.strip()) < 2 :
-            raise ValueError('name must be at least 2 chars')
-        return v.strip()
+    def validate_name(cls , v:str|None)->str|None : 
+        return Validate.strip_and_validate_name(v)
     
     @field_validator('email')
     @classmethod
-    def validate_email(cls , v:str)->str : 
-        v = v.strip().lower()
-        if '@' not in v or '.' not in v :
-            raise ValueError('invalid email format')
-        return v
+    def validate_email(cls , v:str|None)->str|None : 
+        return Validate.strip_lower_validate_email(v)
+        
 
 class UserCreate(UserBase):
     password:str
     
     @field_validator('password')
     @classmethod
-    def validate_password(cls , val:str) :
-        if len(val) < 5 : 
-            raise ValueError('password must be at least 5 chars')
-        return val
+    def validate_password(cls , v:str) :
+        return Validate.validate_password(v)
         
 
 class UserUpdate(BaseModel):
@@ -40,21 +36,14 @@ class UserUpdate(BaseModel):
     
     @field_validator('name')
     @classmethod
-    def validate_name(cls,v:str|None)->str|None:
-        if v is None : 
-            return None 
-        if len(v.strip())< 2 :
-            raise ValueError('name must be at least 2 chars')
-        return v.strip()
+    def validate_name(cls , v:str|None)->str|None : 
+        return Validate.strip_and_validate_name(v)
     
     @field_validator('email')
     @classmethod
-    def validate_email(cls, v:str|None)->str|None :
-        if v is None :
-            return None 
-        if '@' not in v or '.'  not in v :
-            raise ValueError('invalid email format')
-        return v
+    def validate_email(cls , v:str|None)->str|None : 
+        return Validate.strip_lower_validate_email(v)
+      
     
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -63,3 +52,32 @@ class UserRead(BaseModel):
     email :str
     created_at:datetime | None = None
     updated_at:datetime | None = None
+
+
+UserCreate.model_config = ConfigDict(
+    json_schema_extra={
+        "example" : {
+            "name": "Eslam Kamel",
+            "email": "eslam@example.com",
+            "password": "secret123"
+        }
+    }
+)
+
+UserUpdate.model_config = ConfigDict(
+    json_schema_extra={
+        'example' : {"name": "Eslam K.", "email": "eslam.k@example.com"}
+    }
+)
+
+UserRead.model_config = ConfigDict(
+    json_schema_extra={
+        "example" : {
+            "id": 1,
+            "name": "Eslam Kamel",
+            "email": "eslam@example.com",
+            "created_at": "2025-11-09T10:00:00+00:00",
+            "updated_at": "2025-11-09T10:05:00+00:00"
+        }
+    }
+)

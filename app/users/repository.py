@@ -1,6 +1,7 @@
-from typing import Optional
+from datetime import datetime
+from typing import Any, Optional
 
-from sqlalchemy import select
+from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
@@ -30,8 +31,38 @@ class UserRepository :
         res = await self.session.execute(stmt)
         return res.scalar_one_or_none()
     
-    async def list(self , limit:int=50 , offset:int = 0)->list[User]:
-        stmt = select(User).limit(limit).offset(offset).order_by(User.id)
+    async def count(self,*,q:Optional[str]=None)->int :
+        stmt = select(func.count()).select_from(User)
+        if q :
+            like = f"%{q}%"
+            stmt = stmt.where(
+                User.name.ilike(like) | User.email.ilike(like)
+            )
+        res = await self.session.execute(stmt)
+        return int(res.scalar_one())
+        
+    
+    async def list(
+        self , 
+        limit:int=50 , 
+        offset:int = 0 , * , 
+        q:Optional[str] = None , 
+        order_by:str = 'id' , 
+        direction:str='asc')->list[User]:
+        colmap:dict[str , Any]={
+            'id':User.id ,
+            'name':User.name,
+            'email':User.email,
+            'created_at':User.created_at,
+        }
+        col = colmap.get(order_by , User.id)
+        sorter = asc(col) if direction.lower() == 'asc' else desc(col)
+        stmt = select(User).order_by(sorter).limit(limit).offset(offset)
+        if q :
+            like = f"%{q}%"
+            stmt = stmt.where(
+                User.name.ilike(like) | User.email.ilike(like)
+            )
         res = await self.session.execute(stmt)
         users = list(res.scalars().all())
         return users

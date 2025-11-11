@@ -1,6 +1,6 @@
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.params import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +12,7 @@ from app.users.schema import UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix='/users' , tags=['users'])
 
-@router.post('' , response_model=UserRead , status_code=status.HTTP_200_OK)
+@router.post('' , response_model=UserRead , status_code=status.HTTP_201_CREATED)
 async def create_user(payload:UserCreate , session:AsyncSession=Depends(get_session)) :
     repo = UserRepository(session)
     existing = await repo.get_by_email(payload.email)
@@ -31,11 +31,18 @@ async def get_user(user_id:Annotated[int , Path(ge=1)] , session:AsyncSession=De
 
 @router.get('' , response_model=list[UserRead] , status_code=status.HTTP_200_OK)
 async def list_users( 
-                     limit:int = Query(50 , ge=1  , le=200), 
-                     offset:int = Query(0 , ge=0),
-                     session:AsyncSession=Depends(get_session)):
+                     response:Response,
+                     limit:int = Query(50 , ge=1  , le=200 , description="Max number to return"), 
+                     offset:int = Query(0 , ge=0 , description="Items to skip(offset)"),
+                     q:Optional[str] = Query(None , description="search in name/email"),
+                     order_by:str = Query('id'  , pattern="^(id|name|email|created_at)$") ,
+                     direction:str = Query('asc' , pattern="^(asc|desc)$"),
+                     session:AsyncSession=Depends(get_session) , 
+                     ):
     repo = UserRepository(session)
-    users:list[User] = await repo.list(limit , offset)
+    total = await repo.count(q=q)
+    response.headers['X-TOTAL-COUNT'] = str(total)
+    users:list[User] = await repo.list(limit , offset , q=q , order_by=order_by , direction=direction)
     return users
 
 @router.patch('/{user_id}' , response_model=UserRead , status_code=status.HTTP_200_OK)
